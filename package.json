@@ -61,7 +61,9 @@
     "start": "node scripts/start.js",
     "build": "node scripts/build.js",
     "test": "node scripts/test.js",
-    "stylelint": "npx stylelint \"**/*.css\""
+    "stylelint": "npx stylelint \"**/*.css\"",
+    "task_1": "node scripts/task_1.js",
+    "task_2": "node scripts/task_2.js"
   },
   "eslintConfig": {
     "extends": [
