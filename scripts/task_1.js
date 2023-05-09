@@ -3,8 +3,6 @@ const config = require("../.stylelintrc.json");
 const path = require('path');
 const fs = require('fs').promises;
 
-const STYLE_LINT_FILE_IGNORE_PATTERN = /\/*.*stylelint-disable \*\//
-
 async function clear() {
     await fs.truncate('.stylelintignore', 0);
 }
@@ -17,7 +15,7 @@ async function processStylePath(styleFile) {
     try {
         const files = await stylelint.lint({ config, files: styleFile });
 
-        const candidate = files.results.find((file) => !file._postcssResult.css.match(STYLE_LINT_FILE_IGNORE_PATTERN));
+        const candidate = files.results.find((file) => !file._postcssResult.stylelint.ignored && file._postcssResult.stylelint.stylelintError);
 
         return candidate?.source?.replace(path.join(__dirname, '../'), '') || null;
     } catch (e) {}
