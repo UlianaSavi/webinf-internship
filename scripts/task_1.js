@@ -25,12 +25,75 @@ async function processStylePath(styleFile) {
     return null;
 }
 
+async function tryToPackFolder(filesArray = []) {
+    const getFiles = async (folder, files_ = []) => {
+        let newFiles = [...files_];
+        const files = await fs.readdir(folder);
+        for (let i in files) {
+            const name = folder + '\\' + files[i];
+            const stat = await fs.stat(name);
+            if (stat.isDirectory()) {
+                newFiles = await getFiles(name, newFiles);
+            } else {
+                newFiles.push(name);
+            }
+        }
+        return newFiles;
+    };
+
+    const allFiles = await getFiles(path.join(__dirname, '../src/components/'));
+    const clearedFiles = allFiles
+        .map(item => item.replace(path.join(__dirname, '../'), '').replace(/\\\\/g, '\\').replace(/\\/g, '/'))
+        .map((item) => item.split('/'));
+    const clearedIgnoredFiles = filesArray.map((item) => item.split('/'));
+
+    const actualFilesByFolder = clearedFiles.reduce((acc, val) => {
+        if (val[2]) {
+            acc[val[2]] = clearedFiles.filter((item) => item[2] && item[2] === val[2])?.length || 0;
+        }
+        return acc;
+    }, {});
+
+    const ignoredFilesByFolder = clearedIgnoredFiles.reduce((acc, val) => {
+        if (val[2]) {
+            acc[val[2]] = clearedIgnoredFiles.filter((item) => item[2] && item[2] === val[2])?.length || 0;
+        }
+        return acc;
+    }, {}) || {};
+
+    const foldersToSquash = [];
+
+    Object.keys(ignoredFilesByFolder).forEach((key) => {
+        if ((actualFilesByFolder[key] === ignoredFilesByFolder[key]) && actualFilesByFolder[key] !== 1) {
+            foldersToSquash.push(key);
+        }
+    });
+
+    let result = [...clearedIgnoredFiles];
+
+    foldersToSquash.forEach((item) => {
+        const itemIndex = result.findIndex((clearedItem) => clearedItem.includes(item));
+        if (!result[itemIndex]) {
+            return;
+        }
+        const candidate = [...[...result[itemIndex]].splice(0,3), '**/*.css'];
+        result = result.filter((clearedItem) => !clearedItem.includes(item));
+        result.splice(itemIndex, 0, candidate);
+    });
+    
+    return result.map(i => i.join('/'));
+}
+
 async function processStyles(styleFiles) {
     const styleFilesArr = styleFiles.split(/\r?\n/);
 
     const candidatesArray = await Promise.all(styleFilesArr.map(processStylePath));
 
-    return candidatesArray.flat().filter((item) => item).join(`
+    const filesArray = candidatesArray.flat().filter((item) => item);
+
+    const foldersArray = await tryToPackFolder(filesArray);
+
+    return foldersArray.join(`
 `);
 }
 
