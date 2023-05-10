@@ -128,10 +128,10 @@ async function processFileErrors(styleFile) {
         const resultCheck = [];
         for (let i = 0; i < files.results.length; i++) {
             const file = files.results[i];
-            if (!file._postcssResult?.stylelint?.ignored) {
+            if (!file._postcssResult?.stylelint?.ignored && file._postcssResult?.stylelint?.stylelintError) {
                 const fileMessages = createFileMessages(file._postcssResult.messages);
                 const result = await processFile(file.source, fileMessages);
-                resultCheck.push(result);  
+                resultCheck.push(result);
             }
         }
         return resultCheck.every((r) => r);
@@ -142,7 +142,6 @@ async function processFileErrors(styleFile) {
 
 async function processStyles(styleFiles) {
     const styleFilesArr = styleFiles.split(/\r?\n/);
-
     const results = await Promise.all(styleFilesArr.map(processFileErrors));
 
     return results;

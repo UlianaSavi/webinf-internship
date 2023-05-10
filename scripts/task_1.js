@@ -15,7 +15,7 @@ async function processStylePath(styleFile) {
     try {
         const files = await stylelint.lint({ config, files: styleFile });
 
-        const candidate = files.results.find((file) => !file._postcssResult.stylelint.ignored && file._postcssResult.stylelint.stylelintError);
+        const candidate = files.results.find((file) => !file._postcssResult.stylelint.ignored && file._postcssResult?.stylelint?.stylelintError);
 
         return candidate?.source?.replace(path.join(__dirname, '../'), '') || null;
     } catch (e) {}
