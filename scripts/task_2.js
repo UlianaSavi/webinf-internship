@@ -7,10 +7,6 @@ async function clearIgnoreFile() {
     await fs.truncate('.stylelintignore', 0);
 }
 
-async function save(result) {
-    await fs.writeFile('.stylelintignore', result);
-}
-
 function structMessage(messages = [], linesToDisable = 0, selectorLen = 0) {
     return {
         rules: [...new Set(messages.map((message) => message.rule))],
@@ -28,7 +24,8 @@ function createFileMessages(messages = []) {
         .reduce((acc, val) => {
             const linesToDisable = (val?.messages?.at(0)?.node?.selector?.split('\n')?.length - 1 || 0);
             const selectorLen = (val?.messages?.at(0)?.node?.source?.end.line - val?.messages?.at(0)?.node?.source?.start.line + 1) || 0;
-            acc[val.line] = structMessage(val.messages, linesToDisable, selectorLen);
+            const stylesInSelector = (val?.messages?.at(0)?.node?.value?.split('\n')?.length - 1 || 0);
+            acc[val.line] = structMessage(val.messages, linesToDisable + stylesInSelector, selectorLen);
             return acc;
         }, {});
 
@@ -86,7 +83,11 @@ function addStylelintDisable(file = '', fileMessages) {
         }
 
         if ((i - 2) <= 0) {
-            fileLines.unshift(ignoreStr);
+            if (fileLines.at(0).includes('/* stylelint-disable')) {
+                fileLines.splice(i - 1, 0, ignoreStr);
+            } else {
+                fileLines.unshift(ignoreStr);
+            }
         } else {
             fileLines.splice(i - 1, 0, ignoreStr);
         }
@@ -127,9 +128,11 @@ async function processFileErrors(styleFile) {
         const resultCheck = [];
         for (let i = 0; i < files.results.length; i++) {
             const file = files.results[i];
-            const fileMessages = createFileMessages(file._postcssResult.messages);
-            const result = await processFile(file.source, fileMessages);
-            resultCheck.push(result);
+            if (!file._postcssResult?.stylelint?.ignored) {
+                const fileMessages = createFileMessages(file._postcssResult.messages);
+                const result = await processFile(file.source, fileMessages);
+                resultCheck.push(result);  
+            }
         }
         return resultCheck.every((r) => r);
     } catch (e) {console.log(e);}
@@ -152,7 +155,5 @@ async function init() {
 
     await processStyles(styleLintIgnore);
     console.log('procced!');
-
-    // await save(styleLintIgnore);
 }
 init();
