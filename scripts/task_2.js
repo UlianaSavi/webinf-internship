@@ -26,7 +26,7 @@ function createFileMessages(messages = []) {
         .map((line) => ({ line, messages: messages.filter((message) => message?.node?.source?.start?.line === line) }))
         .sort((a, b) => a.line < b.line ? -1 : 0)
         .reduce((acc, val) => {
-            const linesToDisable = (val?.messages?.at(0)?.node?.selector?.split(',\n')?.length - 1 || 0);
+            const linesToDisable = (val?.messages?.at(0)?.node?.selector?.split('\n')?.length - 1 || 0);
             const selectorLen = (val?.messages?.at(0)?.node?.source?.end.line - val?.messages?.at(0)?.node?.source?.start.line + 1) || 0;
             acc[val.line] = structMessage(val.messages, linesToDisable, selectorLen);
             return acc;
@@ -124,7 +124,6 @@ async function processFile(path = '', fileMessages) {
 async function processFileErrors(styleFile) {
     try {
         const files = await stylelint.lint({ config, files: styleFile });
-        fs.writeFile(path.join(__dirname, '../res.json'), JSON.stringify(files, null, 4), 'utf-8');
         const resultCheck = [];
         for (let i = 0; i < files.results.length; i++) {
             const file = files.results[i];
@@ -132,9 +131,7 @@ async function processFileErrors(styleFile) {
             const result = await processFile(file.source, fileMessages);
             resultCheck.push(result);
         }
-
         return resultCheck.every((r) => r);
-        // fs.writeFile(path.join(__dirname, '../res.json'), JSON.stringify(files.results, null, 4), 'utf-8');
     } catch (e) {console.log(e);}
 
     return false;
