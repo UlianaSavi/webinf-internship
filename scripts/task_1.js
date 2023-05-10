@@ -15,9 +15,11 @@ async function processStylePath(styleFile) {
     try {
         const files = await stylelint.lint({ config, files: styleFile });
 
-        const candidate = files.results.find((file) => file._postcssResult?.stylelint?.stylelintError );
-
-        return candidate?.source?.replace(path.join(__dirname, '../'), '') || null;
+        const candidates = files.results
+            .filter((file) => file.errored )
+            .map((candidate) => candidate?.source?.replace(path.join(__dirname, '../'), '').replace(/\\/g, '/'));
+        
+        return candidates || null;
     } catch (e) {}
 
     return null;
@@ -28,7 +30,7 @@ async function processStyles(styleFiles) {
 
     const candidatesArray = await Promise.all(styleFilesArr.map(processStylePath));
 
-    return candidatesArray.filter((item) => item).join(`
+    return candidatesArray.flat().filter((item) => item).join(`
 `);
 }
 
