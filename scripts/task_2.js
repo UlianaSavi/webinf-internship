@@ -11,10 +11,11 @@ async function save(result) {
     await fs.writeFile('.stylelintignore', result);
 }
 
-function structMessage(messages = [], linesToDisable = 0) {
+function structMessage(messages = [], linesToDisable = 0, selectorLen = 0) {
     return {
         rules: [...new Set(messages.map((message) => message.rule))],
-        linesToDisable
+        linesToDisable,
+        selectorLen
     };
 }
 
@@ -25,15 +26,35 @@ function createFileMessages(messages = []) {
         .map((line) => ({ line, messages: messages.filter((message) => message?.node?.source?.start?.line === line) }))
         .sort((a, b) => a.line < b.line ? -1 : 0)
         .reduce((acc, val) => {
-            const linesToDisable = (val?.messages?.at(0)?.node?.selector?.split(',\n')?.length || 0) - 1;
-            acc[val.line] = structMessage(val.messages, linesToDisable);
+            const linesToDisable = (val?.messages?.at(0)?.node?.selector?.split(',\n')?.length - 1 || 0);
+            const selectorLen = (val?.messages?.at(0)?.node?.source?.end.line - val?.messages?.at(0)?.node?.source?.start.line + 1) || 0;
+            acc[val.line] = structMessage(val.messages, linesToDisable, selectorLen);
             return acc;
         }, {});
+
+        Object.entries(byLines).forEach(([line, value]) => {
+            const candidates = Object.entries(byLines).filter(([key, val]) => {
+                if (value.linesToDisable && value.selectorLen) {
+                    console.log(key, line, value);
+                    return (+line < +key && (+key < (value.selectorLen + (+line))));
+                }
+
+                return false;
+            });
+
+            if (candidates.length) {
+                console.log('candidates for line: ', line, candidates);
+                candidates.forEach(([itemKey, itemValue]) => {
+                    byLines[line] = { ...byLines[line], rules: [...new Set([...(byLines[line]?.rules || []), ...(itemValue?.rules || [])])] };
+                    delete byLines[itemKey];
+                });
+            }
+        });
 
     return byLines;
 }
 
-function deleteMessagesLine(lineToDelete, fileMessages) {
+function deleteMessagesLine(lineToDelete, fileMessages, linesToUp) {
     if (lineToDelete !== 0 && !lineToDelete) {
         return fileMessages;
     }
@@ -45,7 +66,7 @@ function deleteMessagesLine(lineToDelete, fileMessages) {
     const reversedFile = Object.entries(lines).reverse();
 
     reversedFile.forEach(([line, item]) => {
-        lines[+line + 1] = item;
+        lines[+line + linesToUp] = item; // смещение строки после добавления коментария
         delete lines[line];
     });
 
@@ -59,23 +80,25 @@ function addStylelintDisable(file = '', fileMessages) {
 
     let i = +Object.keys(messages).at(0);
     while (Object.keys(messages).length && i) {
-        const ignoreStr = `/* stylelint-disable-next-line ${messages[i].rules.join(', ')} */`;
-        
-        if (messages[i].linesToDisable) {
-            for (let j = 0; j < messages[i].linesToDisable; j++) {
-                if (fileLines[i + j]) {
-                    fileLines[i + j] = `${fileLines[i + j]} ${`/* stylelint-disable-line ${messages[i].rules.join(', ')} */`}`;
-                }
-            }
+        const ignoreMultiline = messages[i]?.linesToDisable > 0;
+        let linesToUp = 1;
+        let ignoreStr = `/* stylelint-disable-next-line ${messages[i].rules.join(', ')} */`;
+        if (ignoreMultiline) {
+            ignoreStr = `/* stylelint-disable ${messages[i].rules.join(', ')} */`
         }
 
         if ((i - 2) <= 0) {
-            fileLines.unshift(ignoreStr);
+            fileLines.unshift(ignoreStr); // добавляем disable если строка НУЛЕВАЯ, перед ней нихуа нет
         } else {
-            fileLines.splice(i - 1, 0, ignoreStr);
+            fileLines.splice(i - 1, 0, ignoreStr);  // сетим disable 
         }
 
-        messages = deleteMessagesLine(i, messages);
+        if (ignoreMultiline) {
+            linesToUp = 2;
+            fileLines.splice(i + messages[i]?.selectorLen, 0, `/* stylelint-enable ${messages[i].rules.join(', ')} */`);  // сетим enable 
+        }
+
+        messages = deleteMessagesLine(i, messages, linesToUp);
         i = +Object.keys(messages).at(0);
     }
 
@@ -93,7 +116,7 @@ async function processFile(path = '', fileMessages) {
     }
 
     const file = await fs.readFile(path, 'utf-8');
-
+    console.log(path);
     const result = addStylelintDisable(file, fileMessages);
 
     await fs.writeFile(path, result, 'utf-8');
@@ -136,6 +159,6 @@ async function init() {
     await processStyles(styleLintIgnore);
     console.log('procced!');
 
-    await save(styleLintIgnore);
+    // await save(styleLintIgnore);
 }
 init();
